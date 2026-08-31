@@ -1,0 +1,4 @@
+interface:
+  display_name: "Secure VPS Bootstrap"
+  short_description: "Safely harden a fresh Ubuntu or Debian VPS"
+  default_prompt: "Use $secure-vps-bootstrap to inspect and securely bootstrap my fresh Ubuntu or Debian VPS."
