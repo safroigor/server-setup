@@ -1,6 +1,6 @@
 ---
 name: secure-vps-bootstrap
-description: Safely inspect, bootstrap, harden, verify, or roll back a fresh Ubuntu or Debian VPS over SSH. Use when an AI agent needs to create a key-only non-root administrator, disable remote root and password login without locking out the operator, configure UFW and Fail2ban, install baseline administration tools, enable unattended security updates, or assess whether a new VPS is ready for use.
+description: Safely inspect, bootstrap, harden, verify, or roll back a fresh Ubuntu or Debian VPS over SSH, including applying and verifying current APT security and kernel updates before declaring the host ready. Use when an AI agent needs to create a key-only non-root administrator, disable remote root and password login without locking out the operator, configure UFW and Fail2ban, install baseline administration tools, enable unattended security updates, or assess whether a new VPS is ready for use.
 ---
 
 # Secure VPS Bootstrap
