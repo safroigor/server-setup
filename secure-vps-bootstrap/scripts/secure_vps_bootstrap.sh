@@ -143,6 +143,10 @@ detect_ssh_port() {
   printf '%s' "$detected"
 }
 
+pending_updates() {
+  apt list --upgradable 2>/dev/null | sed '/^Listing\.\.\.$/d;/^[[:space:]]*$/d'
+}
+
 ssh_service() {
   if systemctl list-unit-files ssh.service >/dev/null 2>&1; then printf '%s' ssh; else printf '%s' sshd; fi
 }
@@ -259,7 +263,7 @@ inspect() {
   if command -v ss >/dev/null 2>&1; then ss -lntup 2>/dev/null || ss -lnt 2>/dev/null || true; else log "ss command not installed"; fi
   log "LISTENING_SOCKETS_END"
   log "PENDING_UPDATES_BEGIN"
-  apt list --upgradable 2>/dev/null || true
+  pending_updates || true
   log "PENDING_UPDATES_END"
 }
 
@@ -271,7 +275,7 @@ prepare() {
   local entry
   for entry in "${ALLOW_PORTS[@]}"; do valid_allow_port "$entry" || die "invalid --allow-port value: $entry"; done
   validate_public_key
-  local port existing_user=0 created_user=0 run_dir key_line sudoers_file home added_sudo_group=0
+  local port existing_user=0 created_user=0 run_dir key_line sudoers_file home added_sudo_group=0 pending_updates_output
   if ! port="$(detect_ssh_port)"; then die "could not uniquely determine the effective SSH port; pass --ssh-port after confirming the active listener"; fi
   if id "$ADMIN_USER" >/dev/null 2>&1; then
     existing_user=1
@@ -305,8 +309,15 @@ prepare() {
 
   export DEBIAN_FRONTEND=noninteractive
   apt-get update
-  apt-get -y -o Dpkg::Options::=--force-confold upgrade
+  apt-get -y --with-new-pkgs -o Dpkg::Options::=--force-confold upgrade
   apt-get -y install sudo curl git jq tmux htop ufw fail2ban unattended-upgrades openssh-server
+  pending_updates_output="$(pending_updates || true)"
+  if [[ -n "$pending_updates_output" ]]; then
+    log "PENDING_UPDATES_BEGIN"
+    printf '%s\n' "$pending_updates_output"
+    log "PENDING_UPDATES_END"
+    die "package updates remain after upgrade; resolve them before the SSH checkpoint"
+  fi
 
   if [[ $existing_user -eq 0 ]]; then
     useradd --create-home --shell /bin/bash "$ADMIN_USER"
@@ -445,7 +456,7 @@ verify() {
   require_root
   assert_supported_os
   select_run
-  local run_dir phase admin port sudoers_file service home entry allowed_ports lockdown_connection invoking_user
+  local run_dir phase admin port sudoers_file service home entry allowed_ports lockdown_connection invoking_user pending_updates_output
   run_dir="$(state_dir "$RUN_ID")"
   phase="$(state_get PHASE "$run_dir")"
   [[ "$phase" == LOCKED_DOWN || "$phase" == VERIFIED ]] || die "verify requires a LOCKED_DOWN run; current phase is ${phase:-unknown}"
@@ -474,6 +485,13 @@ verify() {
   fail2ban-client status sshd >/dev/null || die "Fail2ban sshd jail is not active"
   grep -q 'Unattended-Upgrade "1"' "$APT_AUTO_FILE" || die "automatic security upgrades are not enabled"
   grep -q 'Automatic-Reboot "false"' "$APT_AUTO_FILE" || die "automatic reboot is not disabled"
+  pending_updates_output="$(pending_updates || true)"
+  if [[ -n "$pending_updates_output" ]]; then
+    log "PENDING_UPDATES_BEGIN"
+    printf '%s\n' "$pending_updates_output"
+    log "PENDING_UPDATES_END"
+    die "package updates remain; install them and rerun verify before declaring the server ready"
+  fi
   state_set PHASE VERIFIED "$run_dir"
   status STATUS SECURE
   status RUN_ID "$RUN_ID"

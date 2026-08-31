@@ -17,6 +17,7 @@ Harden a fresh Ubuntu or Debian VPS through a guarded two-session workflow. Use 
 - Preserve existing firewall rules. Open only the detected SSH port and ports explicitly requested by the user.
 - Stop on unsupported distributions, failed validation, ambiguous SSH configuration, or an unexpected existing administrator account.
 - Do not reboot automatically. Report `/var/run/reboot-required` at completion.
+- Do not declare the server ready while APT reports pending upgrades; treat the update audit as a mandatory gate.
 
 Read [security-policy.md](references/security-policy.md) before applying changes or troubleshooting a failed gate.
 
@@ -57,7 +58,7 @@ Run from the original session:
 
 Add one `--allow-port PORT/PROTO` for each user-approved public service. Add `--ssh-port PORT` only if automatic detection is wrong. Add `--reuse-admin` only after explicit user approval.
 
-`prepare` updates packages, installs the baseline tools, creates or updates the administrator, configures sudo, enables unattended security updates without automatic reboot, configures UFW and Fail2ban, and prints `STATUS=CHECKPOINT_READY` plus the run ID and backup path.
+`prepare` must run `apt-get update`, upgrade packages with new dependencies allowed so kernel updates are not skipped, install the baseline tools, and audit `apt list --upgradable`. If any packages remain upgradable, print the list and fail before the SSH checkpoint. It then creates or updates the administrator, configures sudo, enables unattended security updates without automatic reboot, configures UFW and Fail2ban, and prints `STATUS=CHECKPOINT_READY` plus the run ID and backup path.
 
 If it fails, do not proceed. Diagnose from the reported failed gate. Use `rollback` when configuration changes were already made.
 
@@ -112,6 +113,7 @@ Require `STATUS=SECURE` and confirm:
 - Fail2ban and its `sshd` jail are active.
 - The administrator exists, has an authorized key, and has a valid sudoers drop-in.
 - Automatic security updates are enabled and automatic reboot is disabled.
+- No packages remain in `apt list --upgradable`; if a reboot is required, report it and rerun verification after the user-approved reboot before declaring the host fully ready.
 
 Remove only the root-only staging directory after verification. Preserve the installed script, `/var/lib/secure-vps-bootstrap`, and `/var/backups/secure-vps-bootstrap` for future verification and rollback. Report that provider-level firewalls or security groups remain outside this host-level check.
 
@@ -129,4 +131,4 @@ After rollback, test the intended original login before closing any session.
 
 ## Completion report
 
-Report the OS, administrator, SSH port, actual UFW rules, requested inbound rules, service status, backup/run ID, whether reboot is required, and exact commands for future `verify` or `rollback`. Never claim that only the requested ports are publicly reachable unless the actual UFW rules, listeners, and any provider firewall were all checked. Never include passwords, private keys, full authorized key contents, or other secrets.
+Report the OS, administrator, SSH port, actual UFW rules, requested inbound rules, service status, pending package updates, backup/run ID, whether reboot is required, and exact commands for future `verify` or `rollback`. Never claim that only the requested ports are publicly reachable unless the actual UFW rules, listeners, and any provider firewall were all checked. Never include passwords, private keys, full authorized key contents, or other secrets.

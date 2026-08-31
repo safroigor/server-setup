@@ -41,9 +41,9 @@ Fail2ban supplements key-only authentication and the firewall; it does not repla
 
 ## Updates and reboot policy
 
-Install current package upgrades and the baseline tools from configured APT repositories. Configure periodic package-list refresh and unattended upgrades in a separate drop-in. Explicitly disable automatic reboot. Never alter third-party repository trust or add repositories.
+Run `apt-get update`, then upgrade with new dependencies allowed (for example `apt-get --with-new-pkgs upgrade`) so kernel updates are not silently skipped; install the baseline tools from configured APT repositories. Afterward, run `apt list --upgradable` as a mandatory update gate. A non-empty result fails the prepare/verify readiness gate and must be reported before continuing. Configure periodic package-list refresh and unattended upgrades in a separate drop-in. Explicitly disable automatic reboot. Never alter third-party repository trust or add repositories.
 
-Report `/var/run/reboot-required`; leave reboot scheduling to the user.
+Report `/var/run/reboot-required`; leave reboot scheduling to the user. When a reboot is required, rerun the update audit and verification after the user-approved reboot before declaring the host fully ready.
 
 ## Backups and rollback
 
